@@ -11,9 +11,13 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import PandasTools
-from gensim.models import word2vec
 import timeit
 from joblib import Parallel, delayed
+
+# Check and set gensim version
+import gensim
+from gensim.models import word2vec
+GENSIM_VERSION = int(gensim.__version__.split('.')[0])
 
 
 class DfVec(object):
@@ -183,7 +187,8 @@ def _read_smi(file_name):
         line = file_name.readline()
         if not line:
             break
-        yield Chem.MolFromSmiles(line.split('\t')[0])
+        m = Chem.MolFromSmiles(line.split('\t')[0])
+        yield Chem.AddHs(m)
 
 
 def generate_corpus(in_file, out_file, r, sentence_type='alt', n_jobs=1):
@@ -259,6 +264,7 @@ def generate_corpus(in_file, out_file, r, sentence_type='alt', n_jobs=1):
             if mol is not None:
                 smiles = Chem.MolToSmiles(mol)
                 mol = Chem.MolFromSmiles(smiles)
+                mol = Chem.AddHs(mol)
                 identifier_sentences, alternating_sentence = mol2sentence(mol, r)
 
                 identifier_sentence_r0 = " ".join(identifier_sentences[0])
@@ -369,7 +375,7 @@ def train_word2vec_model(infile_name, outfile_name=None, vector_size=100, window
   
     start = timeit.default_timer()
     corpus = word2vec.LineSentence(infile_name)
-    model = word2vec.Word2Vec(corpus, size=vector_size, window=window, min_count=min_count, workers=n_jobs, sg=sg,
+    model = word2vec.Word2Vec(corpus, vector_size=vector_size, window=window, min_count=min_count, workers=n_jobs, sg=sg,
                               **kwargs)
     if outfile_name:
         model.save(outfile_name)
@@ -422,7 +428,11 @@ def sentences2vec(sentences, model, unseen=None):
     -------
     np.array
     """
-    keys = set(model.wv.vocab.keys())
+    if GENSIM_VERSION >= 4:
+        keys = set(model.wv.index_to_key)
+    else:
+        keys = set(model.wv.vocab.keys())
+
     vec = []
     if unseen:
         unseen_vec = model.wv.word_vec(unseen)
@@ -462,7 +472,10 @@ def featurize(in_file, out_file, model_path, r, uncommon=None):
     word2vec_model = word2vec.Word2Vec.load(model_path)
     if uncommon:
         try:
-            word2vec_model[uncommon]
+            if GENSIM_VERSION >= 4:
+                word2vec_model.wv.word_vec(uncommon)
+            else:
+                word2vec_model[uncommon]
         except KeyError:
             raise KeyError('Selected word for uncommon: %s not in vocabulary' % uncommon)
 

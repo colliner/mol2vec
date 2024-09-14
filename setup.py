@@ -9,7 +9,7 @@ setup(name='mol2vec',
       classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: BSD 3-clause',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Cheminformatics :: Featurization',
       ],
       url='http://github.com/samoturk/mol2vec',
